@@ -47,69 +47,72 @@ function sniffImageMimeFromBase64(b64) {
 
 function UserCard() {
   const [userData, setUserData] = useState(null);
+  const [imageSrc, setImageSrc] = useState("https://via.placeholder.com/150");
   const token = JSON.parse(localStorage.getItem("user"))?.token;
 
   useEffect(() => {
-    // Get user from localStorage
     const user = JSON.parse(localStorage.getItem("user"));
     if (!user || !user.id) return;
 
-    // Fetch user data from API
+    let objectUrl = null;
+
     axios
       .get(`http://localhost:8086/api/user/${user.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
         setUserData(res.data);
+
+        const mime = sniffImageMimeFromBase64(res.data.imageBase64);
+        if (mime) {
+          const byteChars = atob(res.data.imageBase64);
+          const byteNumbers = new Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) {
+            byteNumbers[i] = byteChars.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: mime });
+          objectUrl = URL.createObjectURL(blob);
+          setImageSrc(objectUrl);
+        }
       })
-      .catch((err) => {
-        console.error("Failed to fetch user data:", err);
-      });
-  }, []);
+      .catch((err) => console.error("Failed to fetch user data:", err));
 
-  if (!userData) {
-    return <div>Loading...</div>;
-  }
+    // Cleanup: revoke blob URL to prevent memory leak
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [token]);
 
-  // Safe construction: only use data URL if bytes match a known image type
-  const mime = sniffImageMimeFromBase64(userData.imageBase64);
-  const imageSrc = mime
-    ? `data:${mime};base64,${userData.imageBase64}`
-    : "https://via.placeholder.com/150";
+  if (!userData) return <div>Loading...</div>;
 
   return (
-    <div>
-      <div className="card">
-        <div className="card-body">
-          <div className="d-flex flex-column align-items-center text-center">
-            <img
-              src={imageSrc}
-              alt="Admin"
-              className="rounded-circle"
-              width={150}
-              height={150}
-            />
-            <div className="mt-3">
-              <h4>{userData.fullName || " "}</h4>
-              <p className="text-secondary mb-1">{userData.category || " "}</p>
-              <p className="text-muted font-size-sm">
-                {userData.address || ""}
-              </p>
-              <p className="text-muted font-size-sm">
-                Followers :{" "}
-                {Array.isArray(userData.followers)
-                  ? userData.followers.length
-                  : 0}
-              </p>
-              <p className="text-muted font-size-sm">
-                Following :{" "}
-                {Array.isArray(userData.following)
-                  ? userData.following.length
-                  : 0}
-              </p>
-            </div>
+    <div className="card">
+      <div className="card-body">
+        <div className="d-flex flex-column align-items-center text-center">
+          <img
+            src={imageSrc}
+            alt="Admin"
+            className="rounded-circle"
+            width={150}
+            height={150}
+          />
+          <div className="mt-3">
+            <h4>{userData.fullName || " "}</h4>
+            <p className="text-secondary mb-1">{userData.category || " "}</p>
+            <p className="text-muted font-size-sm">{userData.address || ""}</p>
+            <p className="text-muted font-size-sm">
+              Followers :{" "}
+              {Array.isArray(userData.followers)
+                ? userData.followers.length
+                : 0}
+            </p>
+            <p className="text-muted font-size-sm">
+              Following :{" "}
+              {Array.isArray(userData.following)
+                ? userData.following.length
+                : 0}
+            </p>
           </div>
         </div>
       </div>
