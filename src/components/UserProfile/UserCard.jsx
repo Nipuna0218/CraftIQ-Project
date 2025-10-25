@@ -48,10 +48,12 @@ function UserCard() {
         return FALLBACK_IMG;
       }
 
-      // Relative URLs (safe when resolved) - allow
+      // Relative URLs (safe when resolved) - allow. Resolve against the
+      // origin only (not the full document location) to avoid using
+      // attacker-controllable path/query fragments from window.location.href.
       if (s.startsWith("/") || s.startsWith("./") || s.startsWith("../")) {
-        // Resolve relative against current origin and ensure http(s)
-        const resolved = new URL(s, window.location.href);
+        // Resolve relative against the page origin (scheme + host + port)
+        const resolved = new URL(s, window.location.origin);
         if (resolved.protocol === "http:" || resolved.protocol === "https:") {
           return resolved.href;
         }
