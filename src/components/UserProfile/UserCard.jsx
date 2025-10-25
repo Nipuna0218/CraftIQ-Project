@@ -24,20 +24,67 @@ function UserCard() {
   }
 
   // Use backend image URL if available, otherwise use placeholder
+  const FALLBACK_IMG = "https://via.placeholder.com/150";
   const imageSrc = userData.hasImage
     ? `http://localhost:8086/api/user/${userData.id}/image`
-    : "https://via.placeholder.com/150";
+    : FALLBACK_IMG;
+
+  // Sanitize/validate image URLs before using them in the DOM to prevent
+  // DOM-based XSS (e.g. javascript: or data:text/html). Allow only:
+  // - absolute http(s) URLs
+  // - relative URLs (starting with /, ./, ../)
+  // - data URLs only when they are image data (data:image/...;base64,)
+  function safeImageSrc(raw) {
+    try {
+      if (!raw) return FALLBACK_IMG;
+      const s = String(raw).trim();
+
+      // data: URLs - allow only image data (png/jpg/gif/webp/jpeg)
+      if (s.toLowerCase().startsWith("data:")) {
+        const lower = s.toLowerCase();
+        if (/^data:image\/(png|jpeg|jpg|gif|webp);base64,/.test(lower)) {
+          return s;
+        }
+        return FALLBACK_IMG;
+      }
+
+      // Relative URLs (safe when resolved) - allow
+      if (s.startsWith("/") || s.startsWith("./") || s.startsWith("../")) {
+        // Resolve relative against current origin and ensure http(s)
+        const resolved = new URL(s, window.location.href);
+        if (resolved.protocol === "http:" || resolved.protocol === "https:") {
+          return resolved.href;
+        }
+        return FALLBACK_IMG;
+      }
+
+      // Absolute URL - allow only http(s)
+      const url = new URL(s);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        return url.href;
+      }
+      return FALLBACK_IMG;
+    } catch (err) {
+      // Any error parsing the URL -> fallback
+      return FALLBACK_IMG;
+    }
+  }
+
+  const safeSrc = safeImageSrc(imageSrc);
 
   return (
     <div className="card">
       <div className="card-body">
         <div className="d-flex flex-column align-items-center text-center">
           <img
-            src={imageSrc}
-            alt="User"
+            src={safeSrc}
+            alt={userData.fullName ? `${userData.fullName} avatar` : "User"}
             className="rounded-circle"
             width={150}
             height={150}
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
           />
           <div className="mt-3">
             <h4>{userData.fullName || " "}</h4>
